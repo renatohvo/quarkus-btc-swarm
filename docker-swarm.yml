@@ -98,13 +98,15 @@ services:
   # caddy:
   #   image: caddy:latest
   #   restart: unless-stopped
+  #   configs: # docker config create caddyfile ./caddy/Caddyfile
+  #     - source: caddyfile
+  #       target: /etc/caddy/Caddyfile
   #   deploy:
   #     replicas: 3  # HA para proxy
   #     restart_policy:
   #       condition: on-failure
   #   volumes:
-  #     - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-  #     - ./caddy/site:/srv
+  #     - caddy_site:srv
   #     - caddy_data:/data
   #     - caddy_config:/config
   #   ports:
@@ -112,6 +114,10 @@ services:
   #     - "443:443"
   #   networks:
   #     - quarkus
+
+configs:
+  caddyfile:
+    external: true
 
 networks:
   quarkus:
@@ -125,6 +131,8 @@ volumes:
   grafana_data:
     driver: local
   portainer_data:
+    driver: local
+  caddy_site:
     driver: local
   caddy_data:
     driver: local
