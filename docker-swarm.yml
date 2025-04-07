@@ -106,7 +106,7 @@ services:
   #     restart_policy:
   #       condition: on-failure
   #   volumes:
-  #     - caddy_site:srv
+  #     - caddy_site:/srv
   #     - caddy_data:/data
   #     - caddy_config:/config
   #   ports:
