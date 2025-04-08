@@ -98,7 +98,7 @@ services:
   # caddy:
   #   image: caddy:latest
   #   restart: unless-stopped
-  #   configs: # external:true => docker config create caddyfile ./caddy/Caddyfile
+  #   configs:
   #     - source: caddyfile
   #       target: /etc/caddy/Caddyfile
   #   deploy:
@@ -118,6 +118,7 @@ services:
 configs:
   caddyfile:
     file: ./caddy/Caddyfile
+    # external: true  # docker config create caddyfile ./caddy/Caddyfile
 
 networks:
   quarkus:
