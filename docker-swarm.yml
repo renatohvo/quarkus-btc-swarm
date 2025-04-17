@@ -91,29 +91,34 @@ services:
       restart_policy:
         condition: on-failure
     ports:
-      - "9000:9000"
+      - 9000:9000
     networks:
       - quarkus
 
-  # caddy:
-  #   image: caddy:latest
-  #   restart: unless-stopped
-  #   configs:
-  #     - source: caddyfile
-  #       target: /etc/caddy/Caddyfile
-  #   deploy:
-  #     replicas: 3  # HA para proxy
-  #     restart_policy:
-  #       condition: on-failure
-  #   volumes:
-  #     - caddy_site:/srv
-  #     - caddy_data:/data
-  #     - caddy_config:/config
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   networks:
-  #     - quarkus
+  caddy:
+    image: caddy:latest
+    restart: unless-stopped
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+        uid: '1000'
+        gid: '1000'
+        mode: 0400   # Somente leitura para o dono
+    deploy:
+      replicas: 3  # HA para proxy
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints: [node.role == manager]  # Executar apenas no manager
+    volumes:
+      - caddy_site:/srv
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      - quarkus
 
 configs:
   caddyfile:

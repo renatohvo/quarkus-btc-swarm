@@ -7,23 +7,23 @@
 
 # Reverse Principal
 meusite.duckdns.org {
-        reverse_proxy meusite.duckdns.org:8080
+        reverse_proxy ip_public:8080
 }
 
 # Reverse Api
 www.meusite.duckdns.org, app.meusite.duckdns.org, quarkus.meusite.duckdns.org {
-        reverse_proxy meusite.duckdns.org:8080
+        reverse_proxy ip_public:8080
 }
 
 # Reverse DevOps
 prometheus.meusite.duckdns.org {
-        reverse_proxy meusite.duckdns.org:9090
+        reverse_proxy ip_public:9090
 }
 
 grafana.meusite.duckdns.org {
-        reverse_proxy meusite.duckdns.org:3000
+        reverse_proxy ip_public:3000
 }
 
 portainer.meusite.duckdns.org {
-        reverse_proxy meusite.duckdns.org:9000
+        reverse_proxy ip_public:9000
 }
