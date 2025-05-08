@@ -1,0 +1,9 @@
+name: my/whitelists
+description: "Custom whitelist"
+whitelist:
+  reason: "custom whitelist"
+  ip:
+    # - "10.10.10.10"
+    # - "10.10.10.11"
+  cidr:
+    # - "10.10.10.10/24"
