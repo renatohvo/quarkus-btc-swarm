@@ -1,29 +1,233 @@
-# Configuração e-mail (opcional)
+# Configurações Globais
 {
         email seu@email.com  # Para notificações do Let's Encrypt
+
+        admin off # Desativa API Caddy http://localhost:2019
+        servers {
+                client_ip_headers X-Forwarded-For
+                # static private_ranges -> 192.168.0.0/16 172.16.0.0/12 10.0.0.0/8 127.0.0.1/8 fd00::/8 ::1
+                trusted_proxies static private_ranges
+                trusted_proxies_strict
+        }
+        order crowdsec before reverse_proxy
+        crowdsec {
+                api_url http://crowdsec:8080
+                api_key ${CROWDSEC_API_KEY}
+                ticker_interval 3s
+        }
+}
+
+(caddy-access-logs) {
+        log {
+                output file /var/log/caddy/access.log {
+                        roll_size 10MiB # Tamanho máximo por arquivo
+                        roll_keep 5 # Máximo de arquivos antigos
+                        roll_keep_for 720h # Tempo máximo armazenamento (30 dias)
+                }
+                format json
+                level DEBUG # melhor que INFO para o Crowdsec
+        }
+}
+
+# Configuração global de rate limit
+(rate-limit) {
+        rate_limit {
+                zone per_ip {
+                        key     {client_ip}
+                        window  40s
+                        events  30
+                }
+                status_code 429
+        }
+}
+
+(handler-errors-response) {
+        handle_errors {
+                @429 `{err.status_code} == 429`
+                handle @429 {
+                        respond "Muitas requisições. Por favor, tente novamente em alguns segundos. 429 Too Many Requests."
+                }
+                handle {
+                        rewrite * /{err.status_code}
+                        reverse_proxy https://http.cat {
+                                header_up Host {upstream_hostport}
+                                replace_status {err.status_code}
+                        }
+                }
+        }
+}
+
+# Configurações de segurança
+(proxy-security) {
+        # Limitar corpo de requisições
+        request_body {
+                max_size 5MB
+        }
+
+        # Headers de segurança
+        header {
+                -Server
+                -X-Powered-By
+                Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+                X-Content-Type-Options "nosniff"
+                X-Frame-Options "DENY"
+                X-Robots-Tag "none"
+                X-Xss-Protection "1; mode=block"
+                Content-Security-Policy "upgrade-insecure-requests"
+                Referrer-Policy "strict-origin-when-cross-origin"
+                # Cache-Control "public, max-age=15, must-revalidate"
+                Feature-Policy "accelerometer 'none'; ambient-light-sensor 'none'; autoplay 'self'; camera 'none'; encrypted-media 'none'; fullscreen 'self'; geolocation 'none'; gyroscope 'none'; magnetometer 'none'; microphone 'none'; midi 'none'; payment 'none'; picture-in-picture *; speaker 'none'; sync-xhr 'none'; usb 'none'; vr 'none'"
+        }
+}
+
+# Configuração do servidor HTTP
+:80 {
+        route {
+                crowdsec # Ativa a proteção do CrowdSec
+
+                # Redirecionamento
+                redir https://{host}{uri} permanent
+        }
+        import caddy-access-logs
 }
 
 # HTTP Challenge
 
 # Reverse Principal
 meusite.duckdns.org {
-        reverse_proxy ip_public:8080
+        tls seu@email.com
+        import handler-errors-response
+        route {
+                crowdsec # Ativa a proteção do CrowdSec
+
+                import proxy-security
+                import rate-limit
+
+                reverse_proxy ip_public:8081 {
+                        header_up Host {host}
+                        header_up X-Real-IP {remote_ip}
+                        header_up X-Forwarded-For {http.request.header.X-Forwarded-For},{client_ip}
+                        transport http {
+                                read_buffer 65536
+                                response_header_timeout 10s
+                                dial_timeout 5s
+                        }
+                        @error status 404
+                        handle_response @error {
+                                rewrite * /{rp.status_code}
+                                reverse_proxy https://http.cat {
+                                        header_up Host {upstream_hostport}
+                                        replace_status {rp.status_code}
+                                }
+                        }
+                }
+        }
+        import caddy-access-logs
 }
 
 # Reverse Api
 www.meusite.duckdns.org, app.meusite.duckdns.org, quarkus.meusite.duckdns.org {
-        reverse_proxy ip_public:8080
+        tls seu@email.com
+        import handler-errors-response
+        route {
+                crowdsec # Ativa a proteção do CrowdSec
+
+                import proxy-security
+                import rate-limit
+
+                reverse_proxy ip_public:8081 {
+                        header_up Host {host}
+                        header_up X-Real-IP {remote_ip}
+                        header_up X-Forwarded-For {http.request.header.X-Forwarded-For},{client_ip}
+                        transport http {
+                                read_buffer 65536
+                                response_header_timeout 10s
+                                dial_timeout 5s
+                        }
+                        @error status 404
+                        handle_response @error {
+                                rewrite * /{rp.status_code}
+                                reverse_proxy https://http.cat {
+                                        header_up Host {upstream_hostport}
+                                        replace_status {rp.status_code}
+                                }
+                        }
+                }
+        }
+        import caddy-access-logs
 }
 
 # Reverse DevOps
 prometheus.meusite.duckdns.org {
-        reverse_proxy ip_public:9090
+        tls seu@email.com
+        import handler-errors-response
+        route {
+                crowdsec # Ativa a proteção do CrowdSec
+
+                import proxy-security
+
+                basic_auth {
+                        meu_user meu_pass
+                }
+
+                reverse_proxy ip_public:9090 {
+                        header_up Host {host}
+                        header_up X-Real-IP {remote_ip}
+                        header_up X-Forwarded-For {http.request.header.X-Forwarded-For},{client_ip}
+                        transport http {
+                                read_buffer 65536
+                                response_header_timeout 10s
+                                dial_timeout 5s
+                        }
+                }
+        }
+        import caddy-access-logs
 }
 
 grafana.meusite.duckdns.org {
-        reverse_proxy ip_public:3000
+        tls seu@email.com
+        import handler-errors-response
+        route {
+                crowdsec # Ativa a proteção do CrowdSec
+
+                import proxy-security
+
+                reverse_proxy ip_public:3000 {
+                        header_up Host {host}
+                        header_up X-Real-IP {remote_ip}
+                        header_up X-Forwarded-For {http.request.header.X-Forwarded-For},{client_ip}
+                        transport http {
+                                read_buffer 65536
+                                response_header_timeout 10s
+                                dial_timeout 5s
+                        }
+                }
+        }
+        import caddy-access-logs
 }
 
 portainer.meusite.duckdns.org {
-        reverse_proxy ip_public:9000
+        tls seu@email.com
+        import handler-errors-response
+        route {
+                crowdsec # Ativa a proteção do CrowdSec
+
+                import proxy-security
+
+                basic_auth {
+                        meu_user meu_pass
+                }
+
+                reverse_proxy ip_public:9000 {
+                        header_up Host {host}
+                        header_up X-Real-IP {remote_ip}
+                        header_up X-Forwarded-For {http.request.header.X-Forwarded-For},{client_ip}
+                        transport http {
+                                read_buffer 65536
+                                response_header_timeout 10s
+                                dial_timeout 5s
+                        }
+                }
+        }
+        import caddy-access-logs
 }

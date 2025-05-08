@@ -4,11 +4,24 @@
 
 ```sh
 docker-compose -f docker-swarm.yml pull
+docker-compose -f docker-compose.yml pull
+```
+
+- Basic Auth Hash para Caddyfile
+
+```sh
+docker run --rm -it caddy caddy hash-password minhaSenhaSecreta
+```
+
+- Docker Compose Up Firewall Crowdsec
+
+```sh
+docker-compose up -d
 ```
 
 1. Init `docker swarm init`
 2. Run `docker stack deploy -c docker-swarm.yml app`
-3. Open Swagger `http://ip_local:8080/q/swagger-ui/`
+3. Open Swagger `http://ip_local:8081/q/swagger-ui/`
 4. Open Prometheus `http://ip_local:9090/`
 5. Open Grafana `http://ip_local:3000/`
 6. Open Portainer `http://ip_local:9000/`

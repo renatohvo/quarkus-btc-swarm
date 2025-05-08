@@ -1,0 +1,19 @@
+services:
+  crowdsec-firewall-bouncer:
+    image: ghcr.io/shgew/cs-firewall-bouncer-docker:latest
+    container_name: crowdsec-firewall-bouncer
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./config/crowdsec-firewall-bouncer.yaml:/config/crowdsec-firewall-bouncer.yaml:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      API_URL: http://127.0.0.1:8080
+      API_KEY: ${API_KEY}
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_MODULE  # Permissão adicional necessária
+    security_opt:
+      - no-new-privileges:true

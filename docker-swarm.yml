@@ -19,16 +19,20 @@ services:
         condition: on-failure
       placement:
         constraints: [node.role == manager]  # Executar apenas no manager
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     ports:
       - 3306:3306
     networks:
       - quarkus
 
   bitcoin-jvm:
-    image: renatohvo/bitcoin-quarkus-jvm:latest
-    build:
-      context: ./quarkus-btc
-      dockerfile: src/main/docker/Dockerfile.${QUARKUS_MODE:-jvm}
+    image: renatohvo/bitcoin-quarkus-jvm:v1.1
     environment:
       QUARKUS_DATASOURCE_PASSWORD: ${DB_ROOT_PASSWORD}
       QUARKUS_DATASOURCE_URL: jdbc:mysql://mysql-bitcoin:3306/bitcoin?autoReconnect=true
@@ -42,7 +46,7 @@ services:
     networks:
       - quarkus
     ports:
-      - 8080:8080
+      - 8081:8081
     depends_on:
       - mysql-bitcoin
 
@@ -52,12 +56,19 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
     ports:
       - 9090:9090
     networks:
       - quarkus
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     command:
       --config.file=/etc/prometheus/prometheus.yml
@@ -68,6 +79,13 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
     ports:
       - 3000:3000
     networks:
@@ -90,14 +108,48 @@ services:
       mode: global  # 1 instância por nó
       restart_policy:
         condition: on-failure
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
     ports:
       - 9000:9000
     networks:
       - quarkus
 
-  caddy:
-    image: caddy:latest
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
     restart: unless-stopped
+    command: sh /crowdsec-setup.sh
+    environment:
+      - GID=1000
+      - BOUNCER_KEY_CADDY=${CROWDSEC_API_KEY}
+    volumes:
+      - ./config/crowdsec-setup.sh:/crowdsec-setup.sh
+      - ./config/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - ./config/mywhitelist.yaml:/etc/crowdsec/parsers/s02-enrich/mywhitelist.yaml:ro
+      - crowdsec_config:/etc/crowdsec
+      - crowdsec_data:/var/lib/crowdsec/data
+      - crowdsec_db:/var/lib/crowdsec/db
+      - caddy_logs:/var/log/caddy
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    ports:
+      - 8080:8080
+    networks:
+      - quarkus
+
+  caddy:
+    image: renatohvo/caddy-crowdsec-duckdns:latest
+    restart: unless-stopped
+    environment:
+      CROWDSEC_API_KEY: ${CROWDSEC_API_KEY}
+      CROWDSEC_AGENT_HOST: http://crowdsec:8080
     configs:
       - source: caddyfile
         target: /etc/caddy/Caddyfile
@@ -105,20 +157,26 @@ services:
         gid: '1000'
         mode: 0400   # Somente leitura para o dono
     deploy:
-      replicas: 3  # HA para proxy
+      mode: global  # Uma instância em cada nó
       restart_policy:
         condition: on-failure
-      placement:
-        constraints: [node.role == manager]  # Executar apenas no manager
     volumes:
       - caddy_site:/srv
       - caddy_data:/data
       - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - 80:80
-      - 443:443
+      - mode: host
+        published: 80
+        target: 80
+      - mode: host
+        published: 443
+        target: 443
     networks:
       - quarkus
+    depends_on:
+      - crowdsec
 
 configs:
   caddyfile:
@@ -143,4 +201,12 @@ volumes:
   caddy_data:
     driver: local
   caddy_config:
+    driver: local
+  caddy_logs:
+    driver: local
+  crowdsec_config:
+    driver: local
+  crowdsec_data:
+    driver: local
+  crowdsec_db:
     driver: local

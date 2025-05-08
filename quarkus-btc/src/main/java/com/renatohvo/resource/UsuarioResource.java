@@ -13,7 +13,7 @@ import java.util.List;
 public class UsuarioResource {
 
     @POST
-    @PermitAll
+    @RolesAllowed("admin")
     @Transactional
     @Consumes(MediaType.APPLICATION_JSON)
     public void inserir(Usuario usuario){
