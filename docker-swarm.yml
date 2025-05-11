@@ -130,7 +130,7 @@ services:
     volumes:
       - ./config/crowdsec-setup.sh:/crowdsec-setup.sh
       - ./config/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
-      - ./config/mywhitelist.yaml:/etc/crowdsec/parsers/s02-enrich/mywhitelist.yaml:ro
+      # - ./config/mywhitelist.yaml:/etc/crowdsec/parsers/s02-enrich/mywhitelist.yaml:ro
       - crowdsec_config:/etc/crowdsec
       - crowdsec_data:/var/lib/crowdsec/data
       - crowdsec_db:/var/lib/crowdsec/db
