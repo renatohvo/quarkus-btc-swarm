@@ -165,7 +165,6 @@ services:
       - caddy_data:/data
       - caddy_config:/config
       - caddy_logs:/var/log/caddy
-      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - mode: host
         published: 80
