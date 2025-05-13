@@ -34,8 +34,8 @@
         rate_limit {
                 zone per_ip {
                         key     {client_ip}
-                        window  40s
-                        events  30
+                        window  1m
+                        events  40
                 }
                 status_code 429
         }
@@ -45,7 +45,7 @@
         handle_errors {
                 @429 `{err.status_code} == 429`
                 handle @429 {
-                        respond "Muitas requisições. Por favor, tente novamente em alguns segundos. 429 Too Many Requests."
+                        respond "Muitas requisições. Por favor, tente novamente em alguns segundos. 429 Too Many Requests." 429
                 }
                 handle {
                         rewrite * /{err.status_code}
