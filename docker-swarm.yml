@@ -1,5 +1,3 @@
-version: '3.3'
-
 services:
   mysql-bitcoin:
     image: renatohvo/mysql-quarkus-db:8.0.34
@@ -17,8 +15,6 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
-      placement:
-        constraints: [node.role == manager]  # Executar apenas no manager
       resources:
         limits:
           cpus: '1.0'
@@ -29,7 +25,7 @@ services:
     ports:
       - 3306:3306
     networks:
-      - quarkus
+      - metrics
 
   bitcoin-jvm:
     image: renatohvo/bitcoin-quarkus-jvm:v1.1
@@ -44,11 +40,21 @@ services:
         parallelism: 1
         delay: 10s
     networks:
-      - quarkus
-    ports:
-      - 8081:8081
+      - metrics
     depends_on:
       - mysql-bitcoin
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    deploy:
+      mode: global
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - metrics
 
   prometheus:
     image: prom/prometheus:v2.26.0
@@ -63,18 +69,18 @@ services:
         reservations:
           cpus: '0.5'
           memory: 256M
-    ports:
-      - 9090:9090
     networks:
-      - quarkus
+      - metrics
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     command:
       --config.file=/etc/prometheus/prometheus.yml
+    depends_on:
+      - cadvisor
 
   grafana:
-    image: grafana/grafana-enterprise
+    image: grafana/grafana:latest
     deploy:
       replicas: 1
       restart_policy:
@@ -86,14 +92,44 @@ services:
         reservations:
           cpus: '0.25'
           memory: 128M
-    ports:
-      - 3000:3000
     networks:
-      - quarkus
+      - metrics
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
+
+  loki:
+    image: grafana/loki
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    networks:
+      - metrics
+
+  promtail:
+    image: grafana/promtail
+    command:
+      --config.file=/etc/promtail/promtail.yml
+    volumes:
+      - caddy_logs:/var/log/caddy
+      - promtail_positions:/run/promtail
+      - /var/log:/var/log
+      - ./config/promtail.yml:/etc/promtail/promtail.yml
+    deploy:
+      mode: global
+    depends_on:
+      - loki
+    networks:
+      - metrics
 
   portainer:
     image: portainer/portainer-ce:latest
@@ -115,10 +151,8 @@ services:
         reservations:
           cpus: '0.25'
           memory: 128M
-    ports:
-      - 9000:9000
     networks:
-      - quarkus
+      - metrics
 
   crowdsec:
     image: crowdsecurity/crowdsec:latest
@@ -126,7 +160,7 @@ services:
     command: sh /crowdsec-setup.sh
     environment:
       - GID=1000
-      - BOUNCER_KEY_CADDY=${CROWDSEC_API_KEY}
+      - BOUNCER_KEY_CADDY=${CROWDSEC_CADDY_BOUNCER_API_KEY}
     volumes:
       - ./config/crowdsec-setup.sh:/crowdsec-setup.sh
       - ./config/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
@@ -139,16 +173,18 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
+      placement:
+        constraints: [node.role == manager]
     ports:
       - 8080:8080
     networks:
-      - quarkus
+      - metrics
 
   caddy:
     image: renatohvo/caddy-crowdsec-duckdns:latest
     restart: unless-stopped
     environment:
-      CROWDSEC_API_KEY: ${CROWDSEC_API_KEY}
+      CROWDSEC_API_KEY: ${CROWDSEC_CADDY_BOUNCER_API_KEY}
       CROWDSEC_AGENT_HOST: http://crowdsec:8080
     configs:
       - source: caddyfile
@@ -157,9 +193,11 @@ services:
         gid: '1000'
         mode: 0400   # Somente leitura para o dono
     deploy:
-      mode: global  # Uma instância em cada nó
+      replicas: 1
       restart_policy:
         condition: on-failure
+      placement:
+        constraints: [node.role == manager]
     volumes:
       - caddy_site:/srv
       - caddy_data:/data
@@ -173,9 +211,24 @@ services:
         published: 443
         target: 443
     networks:
-      - quarkus
+      - metrics
     depends_on:
       - crowdsec
+
+  kuma:
+    image: louislam/uptime-kuma:latest
+    environment:
+      - TZ=America/Sao_Paulo
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints: [node.role == manager]
+    volumes:
+      - kuma_data:/app/data
+    networks:
+      - metrics
 
 configs:
   caddyfile:
@@ -183,7 +236,7 @@ configs:
     # external: true  # docker config create caddyfile ./caddy/Caddyfile
 
 networks:
-  quarkus:
+  metrics:
     driver: overlay
 
 volumes:
@@ -208,4 +261,8 @@ volumes:
   crowdsec_data:
     driver: local
   crowdsec_db:
+    driver: local
+  kuma_data:
+    driver: local
+  promtail_positions:
     driver: local

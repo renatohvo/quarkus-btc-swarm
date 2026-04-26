@@ -1,10 +1,25 @@
-# Caddy Crowdsec Docker Swarm Containers
+# Caddy Crowdsec Docker Swarm - Security/Observability
+
+- Exec Crowdsec Setup
+
+```sh
+chmod +x config/crowdsec-setup.sh
+```
 
 - Pull Images
 
 ```sh
-docker-compose -f docker-swarm.yml pull
-docker-compose -f docker-compose.yml pull
+docker compose -f docker-swarm.yml pull
+```
+
+```sh
+docker compose -f docker-compose.yml pull
+```
+
+- Docker Compose Up Firewall Crowdsec
+
+```sh
+docker compose -f docker-compose.yml up -d
 ```
 
 - Basic Auth Hash para Caddyfile
@@ -13,41 +28,67 @@ docker-compose -f docker-compose.yml pull
 docker run --rm -it caddy caddy hash-password minhaSenhaSecreta
 ```
 
-- Docker Compose Up Firewall Crowdsec
-
-```sh
-docker-compose up -d
-```
-
-1. Init `docker swarm init`
-2. Run `docker stack deploy -c docker-swarm.yml app`
-3. Open Swagger `http://ip_local:8081/q/swagger-ui/`
-4. Open Prometheus `http://ip_local:9090/`
-5. Open Grafana `http://ip_local:3000/`
-6. Open Portainer `http://ip_local:9000/`
-
 - Init Swarm
 
 ```sh
 docker swarm init
 ```
 
-- Stack Deploy no Swarm
+- Stack Deploy Swarm
 
 ```sh
 docker stack deploy -c docker-swarm.yml app
 ```
 
-- Stack Remove Swarm
+- Crowdsec Keys - Caddy Bouncer & Firewall Bouncer
 
 ```sh
-docker stack rm app
+docker exec -it crowdsec_container sh
+```
+
+```sh
+cscli bouncers add caddy-bouncer
+```
+
+```sh
+cscli bouncers add firewall-bouncer
+```
+
+- Prune Stack Deploy Swarm
+
+```sh
+docker stack deploy --prune -c docker-swarm.yml app
+```
+
+- Ports
+
+1. Caddy (Host) `80:443`
+2. Crowdsec (Host) `8080`
+3. CAdvisor `8080`
+4. Quarkus `8081`
+5. Grafana `3000`
+6. Uptime Kuma `3001`
+7. Loki `3100`
+8. MySQL `3306`
+9. Portainer `9000`
+10. Prometheus `9090`
+
+- Update Service no Swarm
+
+```sh
+docker service update app_service --force
 ```
 
 - List Services
 
 ```sh
 docker service ls
+```
+
+- Stack Remove Swarm
+
+```sh
+docker stack rm app
 ```
 
 - Stats

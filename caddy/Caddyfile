@@ -12,7 +12,7 @@
         order crowdsec before reverse_proxy
         crowdsec {
                 api_url http://crowdsec:8080
-                api_key ${CROWDSEC_API_KEY}
+                api_key ${CROWDSEC_CADDY_BOUNCER_API_KEY}
                 ticker_interval 3s
         }
 }
@@ -47,7 +47,8 @@
                 handle @429 {
                         respond "Muitas requisições. Por favor, tente novamente em alguns segundos. 429 Too Many Requests." 429
                 }
-                handle {
+                @401 `{err.status_code} == 401`
+                handle @401 {
                         rewrite * /{err.status_code}
                         reverse_proxy https://http.cat {
                                 header_up Host {upstream_hostport}
@@ -103,14 +104,14 @@ meusite.duckdns.org {
                 import proxy-security
                 import rate-limit
 
-                reverse_proxy ip_public:8081 {
+                reverse_proxy bitcoin-jvm:8081 {
                         header_up Host {host}
                         header_up X-Real-IP {remote_ip}
                         header_up X-Forwarded-For {http.request.header.X-Forwarded-For},{client_ip}
                         transport http {
                                 read_buffer 65536
-                                response_header_timeout 10s
-                                dial_timeout 5s
+                                response_header_timeout 30s
+                                dial_timeout 10s
                         }
                         @error status 404
                         handle_response @error {
@@ -135,14 +136,14 @@ www.meusite.duckdns.org, app.meusite.duckdns.org, quarkus.meusite.duckdns.org {
                 import proxy-security
                 import rate-limit
 
-                reverse_proxy ip_public:8081 {
+                reverse_proxy bitcoin-jvm:8081 {
                         header_up Host {host}
                         header_up X-Real-IP {remote_ip}
                         header_up X-Forwarded-For {http.request.header.X-Forwarded-For},{client_ip}
                         transport http {
                                 read_buffer 65536
-                                response_header_timeout 10s
-                                dial_timeout 5s
+                                response_header_timeout 30s
+                                dial_timeout 10s
                         }
                         @error status 404
                         handle_response @error {
@@ -170,14 +171,14 @@ prometheus.meusite.duckdns.org {
                         meu_user meu_pass
                 }
 
-                reverse_proxy ip_public:9090 {
+                reverse_proxy prometheus:9090 {
                         header_up Host {host}
                         header_up X-Real-IP {remote_ip}
                         header_up X-Forwarded-For {http.request.header.X-Forwarded-For},{client_ip}
                         transport http {
                                 read_buffer 65536
-                                response_header_timeout 10s
-                                dial_timeout 5s
+                                response_header_timeout 30s
+                                dial_timeout 10s
                         }
                 }
         }
@@ -192,14 +193,14 @@ grafana.meusite.duckdns.org {
 
                 import proxy-security
 
-                reverse_proxy ip_public:3000 {
+                reverse_proxy grafana:3000 {
                         header_up Host {host}
                         header_up X-Real-IP {remote_ip}
                         header_up X-Forwarded-For {http.request.header.X-Forwarded-For},{client_ip}
                         transport http {
                                 read_buffer 65536
-                                response_header_timeout 10s
-                                dial_timeout 5s
+                                response_header_timeout 30s
+                                dial_timeout 10s
                         }
                 }
         }
@@ -218,14 +219,36 @@ portainer.meusite.duckdns.org {
                         meu_user meu_pass
                 }
 
-                reverse_proxy ip_public:9000 {
+                reverse_proxy portainer:9000 {
                         header_up Host {host}
                         header_up X-Real-IP {remote_ip}
                         header_up X-Forwarded-For {http.request.header.X-Forwarded-For},{client_ip}
                         transport http {
                                 read_buffer 65536
-                                response_header_timeout 10s
-                                dial_timeout 5s
+                                response_header_timeout 30s
+                                dial_timeout 10s
+                        }
+                }
+        }
+        import caddy-access-logs
+}
+
+kuma.meusite.duckdns.org {
+        tls seu@email.com
+        import handler-errors-response
+        route {
+                crowdsec # Ativa a proteção do CrowdSec
+
+                import proxy-security
+
+                reverse_proxy kuma:3001 {
+                        header_up Host {host}
+                        header_up X-Real-IP {remote_ip}
+                        header_up X-Forwarded-For {http.request.header.X-Forwarded-For},{client_ip}
+                        transport http {
+                                read_buffer 65536
+                                response_header_timeout 30s
+                                dial_timeout 10s
                         }
                 }
         }
