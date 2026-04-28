@@ -17,11 +17,11 @@ services:
         condition: on-failure
       resources:
         limits:
-          cpus: '1.0'
-          memory: 1024M
-        reservations:
           cpus: '0.5'
-          memory: 512M
+          memory: 768M
+        reservations:
+          cpus: '0.25'
+          memory: 384M
     ports:
       - 3306:3306
     networks:
@@ -33,21 +33,33 @@ services:
       QUARKUS_DATASOURCE_PASSWORD: ${DB_ROOT_PASSWORD}
       QUARKUS_DATASOURCE_URL: jdbc:mysql://mysql-bitcoin:3306/bitcoin?autoReconnect=true
     deploy:
-      replicas: 3
+      replicas: 2
       restart_policy:
         condition: on-failure
       update_config:
         parallelism: 1
         delay: 10s
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 512M
+        reservations:
+          cpus: '0.2'
+          memory: 256M
     networks:
       - metrics
-    depends_on:
-      - mysql-bitcoin
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     deploy:
       mode: global
+      resources:
+        limits:
+          cpus: '0.15'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:rw
@@ -64,11 +76,11 @@ services:
         condition: on-failure
       resources:
         limits:
-          cpus: '0.75'
-          memory: 512M
-        reservations:
-          cpus: '0.5'
+          cpus: '0.3'
           memory: 256M
+        reservations:
+          cpus: '0.15'
+          memory: 128M
     networks:
       - metrics
     volumes:
@@ -76,8 +88,6 @@ services:
       - prometheus_data:/prometheus
     command:
       --config.file=/etc/prometheus/prometheus.yml
-    depends_on:
-      - cadvisor
 
   grafana:
     image: grafana/grafana:latest
@@ -85,19 +95,17 @@ services:
       replicas: 1
       restart_policy:
         condition: on-failure
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          cpus: '0.25'
-          memory: 128M
+      # resources:
+      #   limits:
+      #     cpus: '0.5'
+      #     memory: 256M
+      #   reservations:
+      #     cpus: '0.25'
+      #     memory: 128M
     networks:
       - metrics
     volumes:
       - grafana_data:/var/lib/grafana
-    depends_on:
-      - prometheus
 
   loki:
     image: grafana/loki
@@ -107,11 +115,11 @@ services:
         condition: on-failure
       resources:
         limits:
-          cpus: '0.5'
-          memory: 256M
+          cpus: '0.2'
+          memory: 192M
         reservations:
-          cpus: '0.25'
-          memory: 128M
+          cpus: '0.1'
+          memory: 96M
     networks:
       - metrics
 
@@ -126,14 +134,18 @@ services:
       - ./config/promtail.yml:/etc/promtail/promtail.yml
     deploy:
       mode: global
-    depends_on:
-      - loki
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 96M
+        reservations:
+          cpus: '0.05'
+          memory: 48M
     networks:
       - metrics
 
   portainer:
     image: portainer/portainer-ce:latest
-    restart: unless-stopped
     security_opt:
       - no-new-privileges:true
     volumes:
@@ -146,17 +158,16 @@ services:
         condition: on-failure
       resources:
         limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          cpus: '0.25'
+          cpus: '0.2'
           memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
     networks:
       - metrics
 
   crowdsec:
     image: crowdsecurity/crowdsec:latest
-    restart: unless-stopped
     command: sh /crowdsec-setup.sh
     environment:
       - GID=1000
@@ -175,6 +186,13 @@ services:
         condition: on-failure
       placement:
         constraints: [node.role == manager]
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 192M
+        reservations:
+          cpus: '0.1'
+          memory: 96M
     ports:
       - 8080:8080
     networks:
@@ -182,7 +200,6 @@ services:
 
   caddy:
     image: renatohvo/caddy-crowdsec-duckdns:latest
-    restart: unless-stopped
     environment:
       CROWDSEC_API_KEY: ${CROWDSEC_CADDY_BOUNCER_API_KEY}
       CROWDSEC_AGENT_HOST: http://crowdsec:8080
@@ -198,6 +215,13 @@ services:
         condition: on-failure
       placement:
         constraints: [node.role == manager]
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
     volumes:
       - caddy_site:/srv
       - caddy_data:/data
@@ -212,8 +236,6 @@ services:
         target: 443
     networks:
       - metrics
-    depends_on:
-      - crowdsec
 
   kuma:
     image: louislam/uptime-kuma:latest
@@ -225,8 +247,31 @@ services:
         condition: on-failure
       placement:
         constraints: [node.role == manager]
+      # resources:
+      #   limits:
+      #     cpus: '0.2'
+      #     memory: 128M
+      #   reservations:
+      #     cpus: '0.1'
+      #     memory: 64M
     volumes:
       - kuma_data:/app/data
+    networks:
+      - metrics
+
+  heimdall:
+    image: lscr.io/linuxserver/heimdall:latest
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    environment:
+      - APP_URL=https://meusite.duckdns.org/
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - heimdall_config:/config
     networks:
       - metrics
 
@@ -265,4 +310,6 @@ volumes:
   kuma_data:
     driver: local
   promtail_positions:
+    driver: local
+  heimdall_config:
     driver: local

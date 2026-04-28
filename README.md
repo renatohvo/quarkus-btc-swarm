@@ -22,7 +22,7 @@ docker compose -f docker-compose.yml pull
 docker compose -f docker-compose.yml up -d
 ```
 
-- Basic Auth Hash para Caddyfile
+- Basic Auth Hash - Caddyfile
 
 ```sh
 docker run --rm -it caddy caddy hash-password minhaSenhaSecreta
@@ -54,32 +54,19 @@ cscli bouncers add caddy-bouncer
 cscli bouncers add firewall-bouncer
 ```
 
-- Prune Stack Deploy Swarm
+- Service Remove Swarm
 
 ```sh
-docker stack deploy --prune -c docker-swarm.yml app
+docker service rm app_service
 ```
 
-- Ports
-
-1. Caddy (Host) `80:443`
-2. Crowdsec (Host) `8080`
-3. CAdvisor `8080`
-4. Quarkus `8081`
-5. Grafana `3000`
-6. Uptime Kuma `3001`
-7. Loki `3100`
-8. MySQL `3306`
-9. Portainer `9000`
-10. Prometheus `9090`
-
-- Update Service no Swarm
+- Service Update Swarm
 
 ```sh
 docker service update app_service --force
 ```
 
-- List Services
+- Service List
 
 ```sh
 docker service ls
@@ -97,6 +84,21 @@ docker stack rm app
 docker stats
 ```
 
+- Ports
+
+1. Caddy (Host) `80:443`
+2. Heimdall `80`
+3. Crowdsec (Host) `8080`
+4. CAdvisor `8080`
+5. Quarkus `8081`
+6. Grafana `3000`
+7. Uptime Kuma `3001`
+8. Loki `3100`
+9. MySQL `3306`
+10. Portainer `9000`
+11. Prometheus `9090`
+
+##
 
 This project uses Quarkus, the Supersonic Subatomic Java Framework.
 
